@@ -1,0 +1,5 @@
+# Ignore the data folder
+Poker Hands/
+
+# Ignore Python environment libraries
+venv/
