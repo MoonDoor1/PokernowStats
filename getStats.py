@@ -602,7 +602,7 @@ def main(json_filepath, csv_filepath):
         c_bet_stats = calculate_c_bet(data)
         fold_to_3_bet_stats = calculate_fold_to_three_bet(data)
         fold_to_c_bet_stats = calculate_fold_to_c_bet(data)
-        showdown_stats = calculate_showdown_stats(data)
+        #showdown_stats = calculate_showdown_stats(data)
 
         # Convert each stats dictionary to a DataFrame
         vpip_df = pd.DataFrame.from_dict(vpip_stats, orient='index')
@@ -614,12 +614,12 @@ def main(json_filepath, csv_filepath):
         c_bet_df = pd.DataFrame.from_dict(c_bet_stats, orient='index').drop(columns=['hands_played'])
         fold_to_3_bet_df = pd.DataFrame.from_dict(fold_to_3_bet_stats, orient='index').drop(columns=['hands_played'])
         fold_to_c_bet_df = pd.DataFrame.from_dict(fold_to_c_bet_stats, orient='index').drop(columns=['hands_played'])
-        showdown_df = pd.DataFrame.from_dict(showdown_stats, orient='index').drop(columns=['hands_played'])  # Add this line
+        #showdown_df = pd.DataFrame.from_dict(showdown_stats, orient='index').drop(columns=['hands_played'])  # Add this line
 
         bb_per_100_hands_df = pd.DataFrame.from_dict(bb_per_100_hands_stats, orient='index').rename(columns={0: 'BB/100 Hands'})
 
         # Merge the DataFrames on the index (player name)
-        df = pd.concat([vpip_df, pfr_df, agg_df, c_bet_df, three_bet_df, four_bet_df, fold_to_3_bet_df, fold_to_c_bet_df, pnl_df, bb_per_100_hands_df, showdown_df], axis=1)  # Add showdown_df here
+        df = pd.concat([vpip_df, pfr_df, agg_df, c_bet_df, three_bet_df, four_bet_df, fold_to_3_bet_df, fold_to_c_bet_df, pnl_df, bb_per_100_hands_df], axis=1)  # Add showdown_df here
 
         return df
 
