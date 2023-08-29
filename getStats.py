@@ -218,12 +218,14 @@ def calculate_c_bet(data):
 
                 if player_name not in player_stats:
                     player_stats[player_name] = {
-                        'C_bet_count': 0, 'hands_played': 0
+                        'C_bet_count': 0, 'pre_flop_raise_count': 0, 'hands_played': 0
                     }
 
                 # Track the pre-flop raiser
                 if not flop_seen and action_type == 8:  # Raise before flop
-                    pre_flop_raiser = player_name
+                    if pre_flop_raiser is None:
+                        pre_flop_raiser = player_name
+                    player_stats[player_name]['pre_flop_raise_count'] += 1
 
                 # Track C-bet
                 if flop_seen and action_type == 8 and player_name == pre_flop_raiser and not c_bet_made:  # Bet after flop by pre-flop raiser
@@ -233,16 +235,18 @@ def calculate_c_bet(data):
                 players_in_hand.add(player_name)
 
         # Increment the hands played for the players involved
-        for player in players_in_hand:
-            player_stats[player]['hands_played'] += 1
+        if pre_flop_raiser:
+            player_stats[pre_flop_raiser]['hands_played'] += 1
 
     # Calculating final C-bet percentage
     for player_name, stats in player_stats.items():
-        stats['C_bet'] = round(stats['C_bet_count'] / stats['hands_played'] * 100, 2)
+        if stats['pre_flop_raise_count'] > 0:  # Avoid division by zero
+            stats['C_bet'] = round(stats['C_bet_count'] / stats['pre_flop_raise_count'] * 100, 2)
+        else:
+            stats['C_bet'] = 0.0
         del stats['C_bet_count']  # Remove the count after calculating the percentage
 
     return player_stats
-
 def calculate_showdown_stats(data):
     player_stats = {}
 
@@ -329,13 +333,14 @@ def calculate_overall_stats(csv_directory, json_directory, big_blind):
     overall_stats_df = overall_stats_df.groupby(overall_stats_df.index).sum()
 
     # Calculate the percentages and BB/100 Hands for the overall stats
+    
     overall_stats_df['VPIP'] = round(overall_stats_df['VPIP'] / overall_stats_df['hands_played'] * 100, 2)
     overall_stats_df['PFR'] = round(overall_stats_df['PFR'] / overall_stats_df['hands_played'] * 100, 2)
     overall_stats_df['Agg'] = round(overall_stats_df['Agg'] / overall_stats_df['hands_played'] * 100, 2)
     overall_stats_df['3bet'] = round(overall_stats_df['3bet'] / overall_stats_df['hands_played'] * 100, 2)
     overall_stats_df['4bet'] = round(overall_stats_df['4bet'] / overall_stats_df['hands_played'] * 100, 2)
     overall_stats_df['Fold_to_3bet'] = round(overall_stats_df['Fold_to_3bet'] / overall_stats_df['hands_played'] * 100, 2)
-    overall_stats_df['C_bet'] = round(overall_stats_df['C_bet'] / overall_stats_df['hands_played'] * 100, 2)
+    #overall_stats_df['C_bet'] = round(overall_stats_df['C_bet'] / overall_stats_df['pre_flop_raise_count'] * 100, 2)
     overall_stats_df['Fold_to_C_bet'] = round(overall_stats_df['Fold_to_C_bet'] / overall_stats_df['hands_played'] * 100, 2)
     overall_stats_df['BB/100 Hands'] = round((overall_stats_df['PnL'] / overall_stats_df['hands_played'] * 100 ) * big_blind, 2)
 
@@ -474,14 +479,24 @@ def calculate_fold_to_c_bet(data):
 def merge_players_stats(df, player1, player2):
     # Check if both players exist in the DataFrame
     if player1 in df.index and player2 in df.index:
-        # Sum up the statistics of the two players
-        merged_stats = df.loc[player1] + df.loc[player2]
+        # Identify the columns to be summed and averaged
+        sum_columns = ['hands_played', 'PnL', 'BB/100 Hands']
+        avg_columns = [col for col in df.columns if col not in sum_columns]
 
-        # Replace the row of the first player with the summed statistics
-        df.loc[player1] = merged_stats
+        # Sum up the non-percentage statistics of the two players
+        df.loc[player1, sum_columns] = df.loc[[player1, player2], sum_columns].sum()
+
+        # Average the percentage statistics of the two players
+        df.loc[player1, avg_columns] = df.loc[[player1, player2], avg_columns].mean()
 
         # Drop the row of the second player
         df = df.drop(player2)
+
+    # Round all columns to 2 decimal places
+    df = df.round(2)
+
+    # Export the DataFrame to a CSV file
+    df.to_csv('Poker Hands/CSV Output/merged_player_stats.csv')
 
     return df
 
@@ -599,7 +614,7 @@ def main(json_filepath, csv_filepath):
         bb_per_100_hands_stats = calculate_bb_per_100_hands(pnl_stats, hands_played_stats, 0.5)
         three_bet_stats = calculate_three_bet(data)
         four_bet_stats = calculate_four_bet(data) 
-        c_bet_stats = calculate_c_bet(data)
+        #c_bet_stats = calculate_c_bet(data)
         fold_to_3_bet_stats = calculate_fold_to_three_bet(data)
         fold_to_c_bet_stats = calculate_fold_to_c_bet(data)
         #showdown_stats = calculate_showdown_stats(data)
@@ -611,7 +626,7 @@ def main(json_filepath, csv_filepath):
         pnl_df = pd.DataFrame.from_dict(pnl_stats, orient='index').rename(columns={0: 'PnL'})
         three_bet_df = pd.DataFrame.from_dict(three_bet_stats, orient='index').drop(columns=['hands_played'])
         four_bet_df = pd.DataFrame.from_dict(four_bet_stats, orient='index').drop(columns=['hands_played'])
-        c_bet_df = pd.DataFrame.from_dict(c_bet_stats, orient='index').drop(columns=['hands_played'])
+        #c_bet_df = pd.DataFrame.from_dict(c_bet_stats, orient='index').drop(columns=['hands_played'])
         fold_to_3_bet_df = pd.DataFrame.from_dict(fold_to_3_bet_stats, orient='index').drop(columns=['hands_played'])
         fold_to_c_bet_df = pd.DataFrame.from_dict(fold_to_c_bet_stats, orient='index').drop(columns=['hands_played'])
         #showdown_df = pd.DataFrame.from_dict(showdown_stats, orient='index').drop(columns=['hands_played'])  # Add this line
@@ -619,7 +634,7 @@ def main(json_filepath, csv_filepath):
         bb_per_100_hands_df = pd.DataFrame.from_dict(bb_per_100_hands_stats, orient='index').rename(columns={0: 'BB/100 Hands'})
 
         # Merge the DataFrames on the index (player name)
-        df = pd.concat([vpip_df, pfr_df, agg_df, c_bet_df, three_bet_df, four_bet_df, fold_to_3_bet_df, fold_to_c_bet_df, pnl_df, bb_per_100_hands_df], axis=1)  # Add showdown_df here
+        df = pd.concat([vpip_df, pfr_df, agg_df, three_bet_df, four_bet_df, fold_to_3_bet_df, fold_to_c_bet_df, pnl_df, bb_per_100_hands_df], axis=1)  # Add showdown_df here
 
         return df
 
